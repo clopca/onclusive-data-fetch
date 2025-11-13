@@ -35,7 +35,7 @@ jobs:
         python fetch_selenium.py
     
     - name: Upload report as artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: digimind-report
         path: downloads/*.csv

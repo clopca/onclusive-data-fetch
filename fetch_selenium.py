@@ -48,27 +48,111 @@ class DigimindSeleniumFetcher:
         print(f"Logging in as {self.email}...")
         self.driver.get(f"{self.base_url}/login.do")
         
-        # Esperar y llenar el formulario
-        email_field = self.wait.until(
-            EC.presence_of_element_located((By.ID, "username"))
-        )
+        # Esperar a que cargue la página
+        time.sleep(3)
+        
+        # Debug: guardar screenshot
+        try:
+            self.driver.save_screenshot(os.path.join(self.download_dir, "login_page.png"))
+            print("Screenshot saved: login_page.png")
+        except:
+            pass
+        
+        # Intentar diferentes selectores para el campo de email
+        email_field = None
+        selectors = [
+            (By.ID, "username"),
+            (By.ID, "email"),
+            (By.NAME, "username"),
+            (By.NAME, "email"),
+            (By.CSS_SELECTOR, "input[type='email']"),
+            (By.CSS_SELECTOR, "input[type='text']"),
+            (By.XPATH, "//input[@placeholder='Email' or @placeholder='Username']")
+        ]
+        
+        for by, selector in selectors:
+            try:
+                print(f"Trying selector: {by} = {selector}")
+                email_field = self.wait.until(
+                    EC.presence_of_element_located((by, selector))
+                )
+                print(f"Found email field with: {by} = {selector}")
+                break
+            except:
+                continue
+        
+        if not email_field:
+            # Imprimir HTML de la página para debug
+            print("Page source preview:")
+            print(self.driver.page_source[:2000])
+            raise Exception("Could not find email/username field")
+        
+        email_field.clear()
         email_field.send_keys(self.email)
         
-        password_field = self.driver.find_element(By.ID, "password")
+        # Intentar diferentes selectores para password
+        password_field = None
+        password_selectors = [
+            (By.ID, "password"),
+            (By.NAME, "password"),
+            (By.CSS_SELECTOR, "input[type='password']")
+        ]
+        
+        for by, selector in password_selectors:
+            try:
+                password_field = self.driver.find_element(by, selector)
+                print(f"Found password field with: {by} = {selector}")
+                break
+            except:
+                continue
+        
+        if not password_field:
+            raise Exception("Could not find password field")
+        
+        password_field.clear()
         password_field.send_keys(self.password)
         
-        # Submit
-        login_button = self.driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
-        login_button.click()
+        # Screenshot antes de submit
+        try:
+            self.driver.save_screenshot(os.path.join(self.download_dir, "before_submit.png"))
+        except:
+            pass
         
-        # Esperar a que cargue el home (ajustar el selector según la página)
+        # Intentar submit
+        try:
+            login_button = self.driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
+            login_button.click()
+        except:
+            # Si no hay botón, intentar submit del form
+            try:
+                password_field.submit()
+            except:
+                raise Exception("Could not submit login form")
+        
+        # Esperar a que cargue el home
         print("Waiting for home page to load...")
-        self.wait.until(
-            EC.url_contains("/reader/home.do")
-        )
+        try:
+            self.wait.until(
+                EC.url_contains("/reader/home.do")
+            )
+        except:
+            # Puede que redirija a otra URL
+            print(f"Current URL: {self.driver.current_url}")
+            time.sleep(5)
+            
+            # Verificar si estamos logueados (buscando algún elemento característico)
+            if "login" in self.driver.current_url.lower():
+                self.driver.save_screenshot(os.path.join(self.download_dir, "login_failed.png"))
+                raise Exception("Login failed - still on login page")
         
         print("Login successful!")
-        time.sleep(2)  # Esperar un poco más para que cargue todo
+        time.sleep(2)
+        
+        # Screenshot después de login
+        try:
+            self.driver.save_screenshot(os.path.join(self.download_dir, "after_login.png"))
+        except:
+            pass
         
         # Extraer cookies para usar con requests
         self._extract_session()

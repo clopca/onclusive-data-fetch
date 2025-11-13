@@ -35,11 +35,20 @@ jobs:
         python fetch_selenium.py
     
     - name: Upload report as artifact
+      if: success()
       uses: actions/upload-artifact@v4
       with:
         name: digimind-report
         path: downloads/*.csv
         retention-days: 30
+    
+    - name: Upload debug screenshots
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: debug-screenshots
+        path: downloads/*.png
+        retention-days: 7
     
     # Opcional: subir a S3 o enviar por email
     # - name: Upload to S3

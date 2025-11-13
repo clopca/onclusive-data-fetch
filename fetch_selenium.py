@@ -84,8 +84,21 @@ class DigimindSeleniumFetcher:
         continue_button.click()
         print("Clicked Continue button")
         
-        # Esperar a que cargue la página de password
-        time.sleep(3)
+        # Esperar a que cambie la URL o aparezca el campo de password
+        print("Waiting for password page to load...")
+        try:
+            # Esperar a que el campo de password sea visible e interactuable
+            password_field = self.wait.until(
+                EC.visibility_of_element_located((By.CSS_SELECTOR, "input[type='password']"))
+            )
+            print("Password field is visible")
+        except:
+            # Si no aparece, esperar más tiempo
+            print("Password field not visible yet, waiting longer...")
+            time.sleep(5)
+            password_field = self.wait.until(
+                EC.visibility_of_element_located((By.CSS_SELECTOR, "input[type='password']"))
+            )
         
         # Debug screenshot
         try:
@@ -96,8 +109,9 @@ class DigimindSeleniumFetcher:
         
         # PASO 2: Ingresar password
         print("Step 2: Entering password...")
+        # Esperar explícitamente a que sea interactuable
         password_field = self.wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='password']"))
+            EC.element_to_be_clickable((By.CSS_SELECTOR, "input[type='password']"))
         )
         password_field.clear()
         password_field.send_keys(self.password)

@@ -16,6 +16,7 @@ class DigimindSeleniumFetcher:
         self.email = email
         self.password = password
         self.base_url = "https://social.digimind.com/d/hc1"
+        self.auth_url = "https://auth.onclusive.com"
         self.download_dir = download_dir or os.path.join(os.getcwd(), "downloads")
         
         # Crear directorio de descargas si no existe
@@ -44,113 +45,110 @@ class DigimindSeleniumFetcher:
         self.session = None
     
     def login(self):
-        """Login a Digimind y espera a que cargue el home"""
+        """Login via Onclusive SSO (Auth0) - flujo en dos pasos"""
         print(f"Logging in as {self.email}...")
-        self.driver.get(f"{self.base_url}/login.do")
         
-        # Esperar a que cargue la página
+        # Ir a la página de home, que redirigirá al SSO
+        self.driver.get(f"{self.base_url}/reader/home.do")
+        
+        # Esperar a que redirija a la página de Onclusive Auth
+        print("Waiting for Onclusive SSO redirect...")
         time.sleep(3)
         
-        # Debug: guardar screenshot
+        # Debug screenshot
         try:
-            self.driver.save_screenshot(os.path.join(self.download_dir, "login_page.png"))
-            print("Screenshot saved: login_page.png")
+            self.driver.save_screenshot(os.path.join(self.download_dir, "01_sso_page.png"))
+            print(f"Current URL: {self.driver.current_url}")
         except:
             pass
         
-        # Intentar diferentes selectores para el campo de email
-        email_field = None
-        selectors = [
-            (By.ID, "username"),
-            (By.ID, "email"),
-            (By.NAME, "username"),
-            (By.NAME, "email"),
-            (By.CSS_SELECTOR, "input[type='email']"),
-            (By.CSS_SELECTOR, "input[type='text']"),
-            (By.XPATH, "//input[@placeholder='Email' or @placeholder='Username']")
-        ]
-        
-        for by, selector in selectors:
-            try:
-                print(f"Trying selector: {by} = {selector}")
-                email_field = self.wait.until(
-                    EC.presence_of_element_located((by, selector))
-                )
-                print(f"Found email field with: {by} = {selector}")
-                break
-            except:
-                continue
-        
-        if not email_field:
-            # Imprimir HTML de la página para debug
-            print("Page source preview:")
-            print(self.driver.page_source[:2000])
-            raise Exception("Could not find email/username field")
-        
+        # PASO 1: Ingresar email
+        print("Step 1: Entering email...")
+        email_field = self.wait.until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='email'], input[type='text']"))
+        )
         email_field.clear()
         email_field.send_keys(self.email)
+        print(f"Email entered: {self.email}")
         
-        # Intentar diferentes selectores para password
-        password_field = None
-        password_selectors = [
-            (By.ID, "password"),
-            (By.NAME, "password"),
-            (By.CSS_SELECTOR, "input[type='password']")
-        ]
+        # Screenshot antes de Continue
+        try:
+            self.driver.save_screenshot(os.path.join(self.download_dir, "02_email_entered.png"))
+        except:
+            pass
         
-        for by, selector in password_selectors:
-            try:
-                password_field = self.driver.find_element(by, selector)
-                print(f"Found password field with: {by} = {selector}")
-                break
-            except:
-                continue
+        # Click en Continue
+        continue_button = self.wait.until(
+            EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Continue')]"))
+        )
+        continue_button.click()
+        print("Clicked Continue button")
         
-        if not password_field:
-            raise Exception("Could not find password field")
+        # Esperar a que cargue la página de password
+        time.sleep(3)
         
+        # Debug screenshot
+        try:
+            self.driver.save_screenshot(os.path.join(self.download_dir, "03_password_page.png"))
+            print(f"Current URL: {self.driver.current_url}")
+        except:
+            pass
+        
+        # PASO 2: Ingresar password
+        print("Step 2: Entering password...")
+        password_field = self.wait.until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='password']"))
+        )
         password_field.clear()
         password_field.send_keys(self.password)
+        print("Password entered")
         
         # Screenshot antes de submit
         try:
-            self.driver.save_screenshot(os.path.join(self.download_dir, "before_submit.png"))
+            self.driver.save_screenshot(os.path.join(self.download_dir, "04_password_entered.png"))
         except:
             pass
         
-        # Intentar submit
+        # Submit el password (buscar botón Continue o Submit)
         try:
-            login_button = self.driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
-            login_button.click()
+            submit_button = self.wait.until(
+                EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Continue') or contains(text(), 'Log in') or @type='submit']"))
+            )
+            submit_button.click()
+            print("Clicked submit button")
         except:
-            # Si no hay botón, intentar submit del form
-            try:
-                password_field.submit()
-            except:
-                raise Exception("Could not submit login form")
+            # Intentar submit del form
+            password_field.submit()
+            print("Submitted password form")
         
-        # Esperar a que cargue el home
-        print("Waiting for home page to load...")
+        # Esperar a que redirija de vuelta a Digimind
+        print("Waiting for redirect back to Digimind...")
         try:
             self.wait.until(
-                EC.url_contains("/reader/home.do")
+                EC.url_contains("social.digimind.com")
             )
+            print("Successfully redirected to Digimind")
         except:
-            # Puede que redirija a otra URL
-            print(f"Current URL: {self.driver.current_url}")
+            print(f"Current URL after submit: {self.driver.current_url}")
             time.sleep(5)
             
-            # Verificar si estamos logueados (buscando algún elemento característico)
-            if "login" in self.driver.current_url.lower():
-                self.driver.save_screenshot(os.path.join(self.download_dir, "login_failed.png"))
-                raise Exception("Login failed - still on login page")
+            # Verificar si seguimos en auth
+            if "auth.onclusive.com" in self.driver.current_url:
+                self.driver.save_screenshot(os.path.join(self.download_dir, "05_login_failed.png"))
+                print("ERROR: Still on auth page, login might have failed")
+                print("Page source:")
+                print(self.driver.page_source[:2000])
+                raise Exception("Login failed - still on auth page")
+        
+        # Esperar a que cargue completamente el home de Digimind
+        time.sleep(5)
         
         print("Login successful!")
-        time.sleep(2)
         
-        # Screenshot después de login
+        # Screenshot final
         try:
-            self.driver.save_screenshot(os.path.join(self.download_dir, "after_login.png"))
+            self.driver.save_screenshot(os.path.join(self.download_dir, "06_logged_in.png"))
+            print(f"Final URL: {self.driver.current_url}")
         except:
             pass
         

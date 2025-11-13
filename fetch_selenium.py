@@ -30,6 +30,7 @@ class DigimindSeleniumFetcher:
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--disable-gpu')
         chrome_options.add_argument('--window-size=1920,1080')
+        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
         
         # Configurar descargas automáticas
         prefs = {
@@ -39,21 +40,40 @@ class DigimindSeleniumFetcher:
             "safebrowsing.enabled": True
         }
         chrome_options.add_experimental_option("prefs", prefs)
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        chrome_options.add_experimental_option('useAutomationExtension', False)
         
         self.driver = webdriver.Chrome(options=chrome_options)
-        self.wait = WebDriverWait(self.driver, 20)
+        self.wait = WebDriverWait(self.driver, 30)  # 30 segundos de timeout
         self.session = None
+        
+        # Configurar timeouts del driver
+        self.driver.set_page_load_timeout(60)  # 60s para cargar páginas
+        self.driver.set_script_timeout(30)
     
     def login(self):
         """Login via Onclusive SSO (Auth0) - flujo en dos pasos"""
         print(f"Logging in as {self.email}...")
+        print(f"Timestamp: {datetime.now()}")
         
         # Ir a la página de home, que redirigirá al SSO
-        self.driver.get(f"{self.base_url}/reader/home.do")
+        print(f"Navigating to {self.base_url}/reader/home.do")
+        try:
+            self.driver.get(f"{self.base_url}/reader/home.do")
+            print(f"Page loaded. Current URL: {self.driver.current_url}")
+        except Exception as e:
+            print(f"ERROR loading page: {e}")
+            raise
         
         # Esperar a que redirija a la página de Onclusive Auth
         print("Waiting for Onclusive SSO redirect...")
-        time.sleep(3)
+        try:
+            self.wait.until(EC.url_contains("auth.onclusive.com"))
+            print("Successfully redirected to auth.onclusive.com")
+        except:
+            print(f"WARNING: Did not redirect to auth.onclusive.com. Current URL: {self.driver.current_url}")
+        
+        time.sleep(2)
         
         # Debug screenshot
         try:
@@ -64,9 +84,18 @@ class DigimindSeleniumFetcher:
         
         # PASO 1: Ingresar email
         print("Step 1: Entering email...")
-        email_field = self.wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='email'], input[type='text']"))
-        )
+        print(f"Looking for email input field...")
+        try:
+            email_field = self.wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='email'], input[type='text']"))
+            )
+            print("Email field found")
+        except Exception as e:
+            print(f"ERROR: Could not find email field: {e}")
+            print(f"Current URL: {self.driver.current_url}")
+            print(f"Page title: {self.driver.title}")
+            raise
+        
         email_field.clear()
         email_field.send_keys(self.email)
         print(f"Email entered: {self.email}")
@@ -78,18 +107,31 @@ class DigimindSeleniumFetcher:
             pass
         
         # Click en Continue
-        continue_button = self.wait.until(
-            EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Continue')]"))
-        )
-        continue_button.click()
-        print("Clicked Continue button")
+        print("Looking for Continue button...")
+        try:
+            continue_button = self.wait.until(
+                EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Continue')]"))
+            )
+            print("Continue button found, clicking...")
+            continue_button.click()
+            print("Clicked Continue button")
+        except Exception as e:
+            print(f"ERROR: Could not click Continue button: {e}")
+            raise
         
         # Esperar a que la URL cambie de /identifier a /password
         print("Waiting for redirect to password page...")
-        self.wait.until(
-            EC.url_contains("/login/password")
-        )
-        print("Successfully redirected to password page")
+        print(f"Current URL before wait: {self.driver.current_url}")
+        try:
+            self.wait.until(
+                EC.url_contains("/login/password")
+            )
+            print("Successfully redirected to password page")
+            print(f"New URL: {self.driver.current_url}")
+        except Exception as e:
+            print(f"ERROR: Did not redirect to password page: {e}")
+            print(f"Current URL: {self.driver.current_url}")
+            raise
         
         # Debug screenshot
         try:
@@ -149,6 +191,7 @@ class DigimindSeleniumFetcher:
         time.sleep(5)
         
         print("Login successful!")
+        print(f"Timestamp: {datetime.now()}")
         
         # Screenshot final
         try:
@@ -308,4 +351,3 @@ if __name__ == "__main__":
             num_mentions=38345,
             date_range_type="TODAY"
         )
-

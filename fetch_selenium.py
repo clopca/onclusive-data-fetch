@@ -284,8 +284,15 @@ class DigimindSeleniumFetcher:
         params = {'reportFormJson': json.dumps(report_config)}
         
         print(f"Generating report: {title}")
+        print(f"Report config: {json.dumps(report_config, indent=2)}")
         response = self.session.get(url, params=params)
         response.raise_for_status()
+        
+        # Log respuesta
+        print(f"Generate response status: {response.status_code}")
+        if response.text:
+            print(f"Generate response: {response.text[:500]}")
+        
         return response
     
     def check_status(self):
@@ -293,7 +300,14 @@ class DigimindSeleniumFetcher:
         url = f"{self.base_url}/rest/reader/feed/reportasync/checkdownload"
         response = self.session.get(url)
         response.raise_for_status()
-        return response.json()
+        data = response.json()
+        
+        # Log completo en la primera llamada para debug
+        if not hasattr(self, '_first_status_logged'):
+            print(f"Full status response: {json.dumps(data, indent=2)}")
+            self._first_status_logged = True
+        
+        return data
     
     def download_report(self, output_file):
         """Descarga el reporte cuando esté listo"""
@@ -338,6 +352,12 @@ class DigimindSeleniumFetcher:
                 break
             elif state == 'FAILED':
                 raise Exception("Report generation failed")
+            elif state in ['UNKNOW', 'UNKNOWN'] and elapsed > 300:
+                # Si lleva más de 5 minutos en UNKNOW, algo está mal
+                print(f"WARNING: Status stuck in {state} for over 5 minutes")
+                print(f"Full status: {json.dumps(status, indent=2)}")
+                print("Attempting to download anyway...")
+                break
         
         # Descargar
         self.download_report(output_file)

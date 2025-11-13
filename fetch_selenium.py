@@ -307,7 +307,7 @@ class DigimindSeleniumFetcher:
             progress = status.get('progression', 0)
             print(f"Status: {state} - Progress: {progress}% (elapsed: {elapsed:.0f}s)")
             
-            if state == 'COMPLETED':
+            if state in ['COMPLETED', 'DONE']:
                 break
             elif state == 'FAILED':
                 raise Exception("Report generation failed")

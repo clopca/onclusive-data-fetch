@@ -1,0 +1,48 @@
+name: Fetch Digimind Report
+
+on:
+  schedule:
+    # Ejecutar todos los días a las 8 AM UTC
+    - cron: '0 8 * * *'
+  workflow_dispatch:  # Permite ejecutar manualmente
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+    
+    - name: Install Chrome
+      uses: browser-actions/setup-chrome@v1
+      with:
+        chrome-version: stable
+    
+    - name: Fetch report
+      env:
+        DIGIMIND_EMAIL: ${{ secrets.DIGIMIND_EMAIL }}
+        DIGIMIND_PASSWORD: ${{ secrets.DIGIMIND_PASSWORD }}
+      run: |
+        python fetch_selenium.py
+    
+    - name: Upload report as artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: digimind-report
+        path: downloads/*.csv
+        retention-days: 30
+    
+    # Opcional: subir a S3 o enviar por email
+    # - name: Upload to S3
+    #   run: |
+    #     aws s3 cp downloads/ s3://your-bucket/reports/ --recursive
+

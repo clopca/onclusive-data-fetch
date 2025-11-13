@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  digimind-fetcher:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    environment:
+      - DIGIMIND_EMAIL=${DIGIMIND_EMAIL}
+      - DIGIMIND_PASSWORD=${DIGIMIND_PASSWORD}
+    volumes:
+      - ../downloads:/app/downloads
+      - ../:/app
+    shm_size: 2gb  # Importante para Chrome en Docker
+

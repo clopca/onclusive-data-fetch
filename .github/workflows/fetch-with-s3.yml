@@ -1,0 +1,68 @@
+name: Fetch Digimind Report (with S3)
+
+on:
+  schedule:
+    - cron: '0 8 * * *'  # 8 AM UTC daily
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+    
+    - name: Install Chrome
+      uses: browser-actions/setup-chrome@v1
+      with:
+        chrome-version: stable
+    
+    - name: Fetch report
+      env:
+        DIGIMIND_EMAIL: ${{ secrets.DIGIMIND_EMAIL }}
+        DIGIMIND_PASSWORD: ${{ secrets.DIGIMIND_PASSWORD }}
+      run: |
+        python fetch_selenium.py
+    
+    - name: Upload report as artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: digimind-report
+        path: downloads/*.csv
+        retention-days: 30
+    
+    - name: Upload to S3
+      if: success()
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_REGION: ${{ secrets.AWS_REGION }}
+        S3_BUCKET: ${{ secrets.S3_BUCKET }}
+      run: |
+        pip install awscli
+        TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+        aws s3 cp downloads/ s3://${S3_BUCKET}/digimind-reports/${TIMESTAMP}/ --recursive
+        echo "Uploaded to s3://${S3_BUCKET}/digimind-reports/${TIMESTAMP}/"
+    
+    # Opcional: notificar por Slack/Discord/email
+    - name: Notify success
+      if: success()
+      run: |
+        echo "Report generated successfully"
+        # Aquí puedes añadir curl para webhook de Slack/Discord
+    
+    - name: Notify failure
+      if: failure()
+      run: |
+        echo "Report generation failed"
+        # Aquí puedes añadir notificación de error
+

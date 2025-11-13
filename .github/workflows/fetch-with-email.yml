@@ -1,0 +1,78 @@
+name: Fetch Digimind Report (with Email)
+
+on:
+  schedule:
+    - cron: '0 8 * * *'  # 8 AM UTC daily
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+    
+    - name: Install Chrome
+      uses: browser-actions/setup-chrome@v1
+      with:
+        chrome-version: stable
+    
+    - name: Fetch report
+      env:
+        DIGIMIND_EMAIL: ${{ secrets.DIGIMIND_EMAIL }}
+        DIGIMIND_PASSWORD: ${{ secrets.DIGIMIND_PASSWORD }}
+      run: |
+        python fetch_selenium.py
+    
+    - name: Upload report as artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: digimind-report
+        path: downloads/*.csv
+        retention-days: 30
+    
+    - name: Send email with attachment
+      if: success()
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: smtp.gmail.com
+        server_port: 587
+        username: ${{ secrets.SMTP_USERNAME }}
+        password: ${{ secrets.SMTP_PASSWORD }}
+        subject: 'Digimind Report - ${{ github.run_number }}'
+        to: cristobal.callejon@gmail.com
+        from: GitHub Actions
+        body: |
+          Digimind report generated successfully.
+          
+          Run: ${{ github.run_number }}
+          Date: ${{ github.event.repository.updated_at }}
+          
+          See attached CSV file.
+        attachments: downloads/*.csv
+    
+    - name: Send failure notification
+      if: failure()
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: smtp.gmail.com
+        server_port: 587
+        username: ${{ secrets.SMTP_USERNAME }}
+        password: ${{ secrets.SMTP_PASSWORD }}
+        subject: '⚠️ Digimind Report FAILED - ${{ github.run_number }}'
+        to: cristobal.callejon@gmail.com
+        from: GitHub Actions
+        body: |
+          The Digimind report generation failed.
+          
+          Please check the logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+

@@ -24,7 +24,7 @@ def main():
             topic_id=1,
             start_date=start_date.isoformat().replace('+00:00', '.000Z'),
             end_date=end_date.isoformat().replace('+00:00', '.999Z'),
-            output_file="report_today.csv",
+            output_file="report_today.xlsx",
             num_mentions=38345,
             date_range_type="TODAY"
         )

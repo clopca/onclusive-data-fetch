@@ -234,7 +234,7 @@ class DigimindSeleniumFetcher:
         
         report_config = {
             "title": title,
-            "type": "CSV",
+            "type": "XLSX",
             "numberOfMention": num_mentions,
             "unselectedClusters": [],
             "filters": {
@@ -347,7 +347,7 @@ if __name__ == "__main__":
             topic_id=1,
             start_date=start_date.isoformat().replace('+00:00', '.000Z'),
             end_date=end_date.isoformat().replace('+00:00', '.999Z'),
-            output_file="digimind_report.csv",
+            output_file="digimind_report.xlsx",
             num_mentions=38345,
             date_range_type="TODAY"
         )

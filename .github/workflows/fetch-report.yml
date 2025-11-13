@@ -47,7 +47,9 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: debug-screenshots
-        path: downloads/*.png
+        path: |
+          downloads/*.png
+          downloads/*.html
         retention-days: 7
     
     # Opcional: subir a S3 o enviar por email

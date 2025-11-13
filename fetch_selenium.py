@@ -119,18 +119,45 @@ class DigimindSeleniumFetcher:
             print(f"ERROR: Could not click Continue button: {e}")
             raise
         
+        # Esperar un poco después del click
+        time.sleep(5)
+        
+        # Verificar si hay errores en pantalla
+        try:
+            error_elements = self.driver.find_elements(By.CSS_SELECTOR, ".error, .alert, [role='alert'], .error-message")
+            if error_elements:
+                print("ERROR MESSAGES FOUND ON PAGE:")
+                for elem in error_elements:
+                    if elem.is_displayed():
+                        print(f"  - {elem.text}")
+        except:
+            pass
+        
         # Esperar a que la URL cambie de /identifier a /password
         print("Waiting for redirect to password page...")
         print(f"Current URL before wait: {self.driver.current_url}")
+        
+        # Aumentar timeout y reintentarlo
         try:
-            self.wait.until(
+            WebDriverWait(self.driver, 60).until(
                 EC.url_contains("/login/password")
             )
             print("Successfully redirected to password page")
             print(f"New URL: {self.driver.current_url}")
         except Exception as e:
-            print(f"ERROR: Did not redirect to password page: {e}")
+            print(f"ERROR: Did not redirect to password page after 60s: {e}")
             print(f"Current URL: {self.driver.current_url}")
+            print(f"Page title: {self.driver.title}")
+            
+            # Guardar screenshot y HTML para debug
+            try:
+                self.driver.save_screenshot(os.path.join(self.download_dir, "error_after_continue.png"))
+                with open(os.path.join(self.download_dir, "error_page_source.html"), 'w') as f:
+                    f.write(self.driver.page_source)
+                print("Saved error screenshot and page source")
+            except:
+                pass
+            
             raise
         
         # Debug screenshot
